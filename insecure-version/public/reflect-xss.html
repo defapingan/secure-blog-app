@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reflected XSS - Insecure Version</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚨 Reflected XSS</h1>
+            <p>Insecure Version - Reflected XSS Vulnerability</p>
+        </div>
+        
+        <div class="nav">
+            <a href="/">Home</a>
+            <a href="/login.html">Login</a>
+            <a href="/register.html">Register</a>
+            <a href="/posts.html">All Posts</a>
+            <a href="/create-post.html">Create Post</a>
+            <a href="/search.html">Search</a>
+            <a href="/users.html">Users</a>
+            <a href="/reflect-xss.html">Reflected XSS</a>
+            <a href="/dom-xss.html">DOM XSS</a>
+        </div>
+        
+        <div class="content">
+            <div id="userInfo" class="user-corner" style="display: none;">
+            </div>
+            
+            <div class="card">
+                <div class="form-group">
+                    <label for="searchInput">Enter your search:</label>
+                    <input type="text" id="searchInput" name="search" placeholder="Enter text to reflect...">
+                    <button id="reflectButton" class="btn" style="margin-top: 10px;">Reflect</button>
+                </div>
+                
+                <div class="security-demo">
+                    <h3>💡 Working Reflected XSS Payloads:</h3>
+                    <p>Try these verified payloads:</p>
+                    <code>&lt;img src=x onerror=alert('XSS')&gt;</code><br>
+                    <code>&lt;iframe src=javascript:alert('XSS')&gt;</code><br>
+                    <code>&lt;input autofocus onfocus=alert('XSS')&gt;</code><br>
+                    <code>&lt;video&gt;&lt;source onerror=alert('XSS')&gt;</code>
+                    
+                    <h3>📝 Why Some XSS Types Don't Work:</h3>
+                    <p><strong>&lt;script&gt;alert('Reflected XSS')&lt;/script&gt;</strong> - Doesn't execute because modern browsers prevent dynamically inserted &lt;script&gt; tags from running via innerHTML for security reasons.</p>
+                    <p><strong>&lt;svg onload=alert('XSS')&gt;</strong> - May not work due to SVG namespace requirements or browser security restrictions on dynamically inserted SVG elements.</p>
+                    
+                    <p><em>Note: These payloads use various HTML events that execute when specific conditions are met (image load failure, iframe execution, input focus, video source error).</em></p>
+                </div>
+            </div>
+            
+            <div id="results"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let sessionId = localStorage.getItem('sessionId');
+        
+        async function getUserInfo() {
+            if (!sessionId) return;
+            
+            try {
+                const response = await fetch('/api/user', {
+                    headers: {
+                        'Authorization': sessionId
+                    }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    currentUser = data.user;
+                    displayUserInfo();
+                }
+            } catch (error) {
+                localStorage.removeItem('sessionId');
+                sessionId = null;
+            }
+        }
+        
+        function displayUserInfo() {
+            if (currentUser) {
+                const userInfoDiv = document.getElementById('userInfo');
+                userInfoDiv.style.display = 'block';
+                userInfoDiv.innerHTML = `
+                    <div class="user-info">
+                        <strong>Welcome, ${currentUser.username}</strong>
+                        <span class="security-badge">${currentUser.role}</span>
+                        <button id="logoutButton" class="btn btn-danger">Logout</button>
+                    </div>
+                `;
+                
+                document.getElementById('logoutButton').addEventListener('click', logout);
+            }
+        }
+        
+        async function logout() {
+            try {
+                const response = await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': sessionId
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    localStorage.removeItem('sessionId');
+                    sessionId = null;
+                    currentUser = null;
+                    window.location.href = '/';
+                } else {
+                    alert('Logout failed');
+                }
+            } catch (error) {
+                alert('Logout failed');
+            }
+        }
+        
+        async function reflectInput() {
+            const userInput = document.getElementById('searchInput').value;
+            
+            if (!userInput) {
+                showResults('Please enter some text');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/reflect-xss?input=${encodeURIComponent(userInput)}`);
+                const data = await response.json();
+                
+                const resultsContainer = document.getElementById('results');
+                
+                // 🚨 Vulnerability:Direct insertion of unescaped HTML
+                resultsContainer.innerHTML = `
+                    <div class="post">
+                        <h3>Reflected Results</h3>
+                        <div class="post-content">
+                            ${data.message}<br>
+                            Raw input: ${data.userInput}
+                        </div>
+                    </div>
+                `;
+                
+            } catch (error) {
+                showResults(`Error: ${error.message}`);
+            }
+        }
+        
+        function showResults(message) {
+            const resultsContainer = document.getElementById('results');
+            resultsContainer.innerHTML = `<div class="card"><p>${message}</p></div>`;
+        }
+        
+        document.getElementById('reflectButton').addEventListener('click', reflectInput);
+        
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                reflectInput();
+            }
+        });
+        
+        // Initialization
+        async function init() {
+            await getUserInfo();
+        }
+        
+        init();
+    </script>
+</body>
+</html>

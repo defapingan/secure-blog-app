@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Posts - Insecure Version</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚨 All Blog Posts</h1>
+            <p>Insecure Version - XSS Vulnerabilities Present</p>
+        </div>
+        
+        <div class="nav">
+            <a href="/">Home</a>
+            <a href="/login.html">Login</a>
+            <a href="/register.html">Register</a>
+            <a href="/posts.html">All Posts</a>
+            <a href="/create-post.html">Create Post</a>
+            <a href="/search.html">Search</a>
+            <a href="/users.html">Users</a>
+            <a href="/reflect-xss.html">Reflected XSS</a>
+            <a href="/dom-xss.html">DOM XSS</a>
+        </div>
+        
+        <div class="content">
+            <div id="userInfo" class="user-corner" style="display: none;">
+            </div>
+            
+            <div class="vulnerability-alert">
+                ⚠️ WARNING: This page is vulnerable to XSS attacks. Malicious scripts in posts will execute!
+            </div>
+            
+            <div id="message"></div>
+            <div id="posts"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let sessionId = localStorage.getItem('sessionId');
+        
+        async function getUserInfo() {
+            if (!sessionId) return;
+            
+            try {
+                const response = await fetch('/api/user', {
+                    headers: {
+                        'Authorization': sessionId
+                    }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    currentUser = data.user;
+                    displayUserInfo();
+                }
+            } catch (error) {
+                localStorage.removeItem('sessionId');
+                sessionId = null;
+            }
+        }
+        
+        function displayUserInfo() {
+            if (currentUser) {
+                const userInfoDiv = document.getElementById('userInfo');
+                userInfoDiv.style.display = 'block';
+                userInfoDiv.innerHTML = `
+                    <div class="user-info">
+                        <strong>Welcome, ${currentUser.username}</strong>
+                        <span class="security-badge">${currentUser.role}</span>
+                        <button id="logoutButton" class="btn btn-danger">Logout</button>
+                    </div>
+                `;
+                
+                document.getElementById('logoutButton').addEventListener('click', logout);
+            }
+        }
+        
+        async function logout() {
+            try {
+                const response = await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': sessionId
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    localStorage.removeItem('sessionId');
+                    sessionId = null;
+                    currentUser = null;
+                    window.location.href = '/';
+                } else {
+                    showMessage('error', 'Logout failed');
+                }
+            } catch (error) {
+                showMessage('error', 'Logout failed');
+            }
+        }
+        
+        // 🚨 insecure:Directly use innerHTML, XSS vulnerability
+        async function loadPosts() {
+            try {
+                const response = await fetch('/api/posts');
+                const posts = await response.json();
+                
+                const postsContainer = document.getElementById('posts');
+                postsContainer.innerHTML = '';
+                
+                if (posts.length === 0) {
+                    postsContainer.innerHTML = '<div class="card"><p>No posts yet. Be the first to post!</p></div>';
+                    return;
+                }
+                
+                posts.forEach(post => {
+                    // 🚨 Vulnerbility:Directly insert unescaped HTML content
+                    let postContent = `
+                        <div class="post">
+                            <h3>${post.title}</h3>
+                            <div class="post-meta">
+                                Posted by <strong>${post.username}</strong> on 
+                                ${new Date(post.created_at).toLocaleDateString()}
+                    `;
+                    
+                    // Display author's tag
+                    if (currentUser && currentUser.id === post.author_id) {
+                        postContent += ` <span style="color: #c23616; margin-left: 10px;">(Your Post)</span>`;
+                    }
+                    
+                    postContent += `</div>
+                        <div class="post-content">
+                            ${post.content}
+                        </div>
+                    `;
+                    
+                    if (currentUser && currentUser.id === post.author_id) {
+                        postContent += `
+                            <button class="delete-btn btn btn-danger" data-postid="${post.id}">Delete</button>
+                        `;
+                    }
+                    
+                    postContent += `</div>`;
+                    
+                    postsContainer.innerHTML += postContent;
+                });
+                
+                document.querySelectorAll('.delete-btn').forEach(button => {
+                    button.addEventListener('click', function() {
+                        deletePost(this.getAttribute('data-postid'));
+                    });
+                });
+                
+            } catch (error) {
+                showMessage('error', `Error loading posts: ${error.message}`);
+            }
+        }
+        
+        // 🚨 insecure:delet posts
+        async function deletePost(postId) {
+            if (!confirm('Are you sure you want to delete this post?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/posts/${postId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': sessionId
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage('success', 'Post deleted successfully!');
+                    loadPosts();
+                } else {
+                    showMessage('error', 'Failed to delete post');
+                }
+            } catch (error) {
+                showMessage('error', `Error: ${error.message}`);
+            }
+        }
+        
+        function showMessage(type, text) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.innerHTML = `<div class="message ${type}">${text}</div>`;
+        }
+        
+        // Initialization
+        async function init() {
+            await getUserInfo();
+            await loadPosts();
+        }
+        
+        init();
+    </script>
+</body>
+</html>

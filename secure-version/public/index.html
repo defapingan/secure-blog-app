@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blog App - Secure Version</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛡️ SECURE BLOG APP</h1>
+            <p>This version implements all security best practices and protections</p>
+        </div>
+        
+        <div class="nav">
+            <a href="/">Home</a>
+            <a href="/login.html">Login</a>
+            <a href="/register.html">Register</a>
+            <a href="/posts.html">All Posts</a>
+            <a href="/create-post.html">Create Post</a>
+            <a href="/search.html">Search</a>
+            <a href="/reflect-xss.html">Reflected XSS</a>
+            <a href="/dom-xss.html">DOM XSS</a>
+        </div>
+        
+        <div class="content">
+            <div class="security-indicator">
+                ✅ SECURE: All security measures are enabled and active
+            </div>
+            
+            <div id="userInfo" class="user-corner" style="display: none;">
+            </div>
+            
+            <div class="card">
+                <h2>Welcome to the Secure Blog</h2>
+                <p>This application demonstrates secure web development practices:</p>
+                <ul>
+                    <li>SQL Injection protection with parameterized queries</li>
+                    <li>XSS prevention with input sanitization</li>
+                    <li>CSRF protection with tokens</li>
+                    <li>Session management with secure cookies</li>
+                    <li>Password hashing with bcrypt</li>
+                    <li>Security headers with Helmet</li>
+                    <li>Input validation and comprehensive security logging</li>
+                </ul>
+                
+                <div class="security-features">
+                    <h3>🛡️ Active Security Features:</h3>
+                    <p><strong>Content Security Policy:</strong> Prevents XSS attacks</p>
+                    <p><strong>HTTP Strict Transport Security:</strong> Enforces HTTPS</p>
+                    <p><strong>CSRF Tokens:</strong> Protects against cross-site request forgery</p>
+                    <p><strong>Input Validation:</strong> All user inputs are validated and sanitized</p>
+                </div>
+            </div>
+            
+            <h2>Recent Posts</h2>
+            <div id="posts"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let csrfToken = '';
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        async function getUserInfo() {
+            try {
+                const response = await fetch('/api/user');
+                if (response.ok) {
+                    const data = await response.json();
+                    currentUser = data.user;
+                    displayUserInfo();
+                }
+            } catch (error) {
+            }
+        }
+        
+        // 🛡️ secure:get CSRF token
+        async function getCsrfToken() {
+            try {
+                const response = await fetch('/api/csrf-token');
+                const data = await response.json();
+                csrfToken = data.csrfToken;
+            } catch (error) {
+                console.error('Failed to get CSRF token:', error);
+            }
+        }
+        
+        function displayUserInfo() {
+            if (currentUser) {
+                const userInfoDiv = document.getElementById('userInfo');
+                userInfoDiv.style.display = 'block';
+                userInfoDiv.innerHTML = `
+                    <div class="user-info">
+                        <strong>Welcome, ${escapeHtml(currentUser.username)}</strong>
+                        <span class="security-badge">${escapeHtml(currentUser.role)}</span>
+                        <button id="logoutButton" class="btn btn-danger">Logout</button>
+                    </div>
+                `;
+                
+                document.getElementById('logoutButton').addEventListener('click', logout);
+            }
+        }
+        
+        async function logout() {
+            try {
+                const response = await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        _csrf: csrfToken
+                    })
+                });
+                
+                if (response.ok) {
+                    window.location.href = '/';
+                } else {
+                    alert('Logout failed');
+                }
+            } catch (error) {
+                alert('Logout failed');
+            }
+        }
+        
+        // 🛡️ secure:load posts
+        async function loadPosts() {
+            try {
+                const response = await fetch('/api/posts');
+                if (!response.ok) throw new Error('Failed to load posts');
+                const posts = await response.json();
+                
+                const postsContainer = document.getElementById('posts');
+                postsContainer.innerHTML = '';
+                
+                if (posts.length === 0) {
+                    const noPosts = document.createElement('div');
+                    noPosts.className = 'card';
+                    noPosts.textContent = 'No posts yet. Be the first to post!';
+                    postsContainer.appendChild(noPosts);
+                    return;
+                }
+                
+                posts.forEach(post => {
+                    const postElement = document.createElement('div');
+                    postElement.className = 'post';
+                    
+                    // 🛡️ secure:All content is escaped
+                    postElement.innerHTML = `
+                        <h3>${escapeHtml(post.title)}</h3>
+                        <div class="post-meta">
+                            Posted by <strong>${escapeHtml(post.username)}</strong> on 
+                            ${new Date(post.created_at).toLocaleDateString()}
+                        </div>
+                        <div class="post-content">
+                            ${escapeHtml(post.content)}
+                        </div>
+                    `;
+                    
+                    postsContainer.appendChild(postElement);
+                });
+            } catch (error) {
+                const messageDiv = document.getElementById('posts');
+                messageDiv.textContent = 'Error loading posts';
+                messageDiv.className = 'message error';
+            }
+        }
+        
+        // Initializationn
+        async function init() {
+            await getCsrfToken();
+            await getUserInfo();
+            await loadPosts();
+        }
+        
+        init();
+    </script>
+</body>
+</html>

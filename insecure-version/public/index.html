@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blog App - Insecure Version</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚨 INSECURE BLOG APP</h1>
+            <p>This version contains intentional security vulnerabilities for educational purposes</p>
+        </div>
+        
+        <div class="nav">
+            <a href="/">Home</a>
+            <a href="/login.html">Login</a>
+            <a href="/register.html">Register</a>
+            <a href="/posts.html">All Posts</a>
+            <a href="/create-post.html">Create Post</a>
+            <a href="/search.html">Search</a>
+            <a href="/users.html">Users</a>
+            <a href="/reflect-xss.html">Reflected XSS</a>
+            <a href="/dom-xss.html">DOM XSS</a>
+        </div>
+        
+        <div class="content">
+            <!-- 固定logout位置 -->
+            <div id="userInfo" class="user-corner" style="display: none;">
+                <!-- 用户信息将通过JavaScript动态加载 -->
+            </div>
+            
+            <div class="vulnerability-alert">
+                ⚠️ WARNING: This version contains SQL Injection, XSS, and Sensitive Data Exposure vulnerabilities
+            </div>
+            
+            <div class="card">
+                <h2>Welcome to the Insecure Blog</h2>
+                <p>This application demonstrates common web security vulnerabilities:</p>
+                <ul>
+                    <li>SQL Injection in login and search</li>
+                    <li>Cross-Site Scripting (XSS) in post content</li>
+                    <li>Sensitive Data Exposure</li>
+                    <li>No input validation</li>
+                    <li>Weak session management</li>
+                </ul>
+                
+                <div class="security-demo">
+                    <h3>💡 Security Demo Instructions:</h3>
+                    <p><strong>SQL Injection:</strong> Go to Login page and try: <code>' OR '1'='1' --</code></p>
+                    <p><strong>XSS Attack:</strong> Create a post with: <code>&lt;script&gt;alert('XSS')&lt;/script&gt;</code></p>
+                    <p><strong>Reflected XSS:</strong> Visit Reflected XSS page and try XSS payloads</p>
+                    <p><strong>DOM-based XSS:</strong> Visit DOM XSS page and try URL-based attacks</p>
+                    <p><strong>Sensitive Data:</strong> Visit Users page to see exposed passwords</p>
+                </div>
+            </div>
+            
+            <h2>Recent Posts</h2>
+            <div id="posts"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let sessionId = localStorage.getItem('sessionId');
+        
+        // 🚨 不安全：获取用户信息
+        async function getUserInfo() {
+            if (!sessionId) return;
+            
+            try {
+                const response = await fetch('/api/user', {
+                    headers: {
+                        'Authorization': sessionId
+                    }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    currentUser = data.user;
+                    displayUserInfo();
+                }
+            } catch (error) {
+                // 用户未登录是正常情况
+                localStorage.removeItem('sessionId');
+                sessionId = null;
+            }
+        }
+        
+        function displayUserInfo() {
+            if (currentUser) {
+                const userInfoDiv = document.getElementById('userInfo');
+                userInfoDiv.style.display = 'block';
+                userInfoDiv.innerHTML = `
+                    <div class="user-info">
+                        <strong>Welcome, ${currentUser.username}</strong>
+                        <span class="security-badge">${currentUser.role}</span>
+                        <button id="logoutButton" class="btn btn-danger">Logout</button>
+                    </div>
+                `;
+                
+                document.getElementById('logoutButton').addEventListener('click', logout);
+            }
+        }
+        
+        async function logout() {
+            try {
+                const response = await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': sessionId
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    localStorage.removeItem('sessionId');
+                    sessionId = null;
+                    currentUser = null;
+                    window.location.href = '/';
+                } else {
+                    alert('Logout failed');
+                }
+            } catch (error) {
+                alert('Logout failed');
+            }
+        }
+        
+        // 🚨 insecure:Directly use of innerHTML, vulnerable to XSS attacks
+        async function loadPosts() {
+            try {
+                const response = await fetch('/api/posts');
+                const posts = await response.json();
+                
+                const postsContainer = document.getElementById('posts');
+                postsContainer.innerHTML = '';
+                
+                if (posts.length === 0) {
+                    postsContainer.innerHTML = '<div class="card"><p>No posts yet. Be the first to post!</p></div>';
+                    return;
+                }
+                
+                posts.forEach(post => {
+                    // 🚨 Vulnerability:Direct insertion of unescaped HTML
+                    postsContainer.innerHTML += `
+                        <div class="post">
+                            <h3>${post.title}</h3>
+                            <div class="post-meta">
+                                Posted by <strong>${post.username}</strong> on 
+                                ${new Date(post.created_at).toLocaleDateString()}
+                            </div>
+                            <div class="post-content">
+                                ${post.content}
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch (error) {
+                document.getElementById('posts').innerHTML = 
+                    `<div class="message error">Error loading posts: ${error.message}</div>`;
+            }
+        }
+        
+        // Initialization
+        async function init() {
+            await getUserInfo();
+            await loadPosts();
+        }
+        
+        init();
+    </script>
+</body>
+</html>

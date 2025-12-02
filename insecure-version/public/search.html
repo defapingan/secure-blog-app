@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search - Insecure Version</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚨 Search Posts</h1>
+            <p>Insecure Version - SQL Injection Vulnerability</p>
+        </div>
+        
+        <div class="nav">
+            <a href="/">Home</a>
+            <a href="/login.html">Login</a>
+            <a href="/register.html">Register</a>
+            <a href="/posts.html">All Posts</a>
+            <a href="/create-post.html">Create Post</a>
+            <a href="/search.html">Search</a>
+            <a href="/users.html">Users</a>
+            <a href="/reflect-xss.html">Reflected XSS</a>
+            <a href="/dom-xss.html">DOM XSS</a>
+        </div>
+        
+        <div class="content">
+            <div id="userInfo" class="user-corner" style="display: none;">
+            </div>
+            
+            <div class="card">
+                <div class="form-group">
+                    <label for="searchInput">Search Posts:</label>
+                    <input type="text" id="searchInput" name="search" placeholder="Enter search terms...">
+                    <button id="searchButton" class="btn" style="margin-top: 10px;">Search</button>
+                </div>
+                
+                <div class="security-demo">
+                    <h3>💡 SQL Injection Demo:</h3>
+                    <p>Try these search terms to exploit SQL injection(need a space after the texts):</p>
+                    <code>' OR '1'='1 -- </code> : Shows all posts<br>
+                    <code>' UNION SELECT 1,2,3,4,5,6 -- </code> : Determine column count<br>
+                    <code>' UNION SELECT 1,username,password,email,5,6 FROM users -- </code> : Steal user data<br>
+                    <code>' UNION SELECT 1,@@version,database(),user(),5,6 -- </code> : Get database information<br>
+                </div>
+            </div>
+            
+            <div id="searchResults"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let sessionId = localStorage.getItem('sessionId');
+        
+        async function getUserInfo() {
+            if (!sessionId) return;
+            
+            try {
+                const response = await fetch('/api/user', {
+                    headers: {
+                        'Authorization': sessionId
+                    }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    currentUser = data.user;
+                    displayUserInfo();
+                }
+            } catch (error) {
+                localStorage.removeItem('sessionId');
+                sessionId = null;
+            }
+        }
+        
+        function displayUserInfo() {
+            if (currentUser) {
+                const userInfoDiv = document.getElementById('userInfo');
+                userInfoDiv.style.display = 'block';
+                userInfoDiv.innerHTML = `
+                    <div class="user-info">
+                        <strong>Welcome, ${currentUser.username}</strong>
+                        <span class="security-badge">${currentUser.role}</span>
+                        <button id="logoutButton" class="btn btn-danger">Logout</button>
+                    </div>
+                `;
+                
+                document.getElementById('logoutButton').addEventListener('click', logout);
+            }
+        }
+        
+        async function logout() {
+            try {
+                const response = await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': sessionId
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    localStorage.removeItem('sessionId');
+                    sessionId = null;
+                    currentUser = null;
+                    window.location.href = '/';
+                } else {
+                    alert('Logout failed');
+                }
+            } catch (error) {
+                alert('Logout failed');
+            }
+        }
+        
+        async function searchPosts() {
+            const searchTerm = document.getElementById('searchInput').value;
+            
+            if (!searchTerm) {
+                showResults('Please enter a search term');
+                return;
+            }
+            
+            try {
+                // 🚨 insecure:Directly pass the search term to the server
+                const response = await fetch(`/api/search?q=${encodeURIComponent(searchTerm)}`);
+                const results = await response.json();
+                
+                const resultsContainer = document.getElementById('searchResults');
+                
+                if (results.length === 0) {
+                    resultsContainer.innerHTML = '<div class="card"><p>No posts found matching your search.</p></div>';
+                    return;
+                }
+                
+                let html = '<h2>Search Results</h2>';
+                
+                results.forEach(post => {
+                    // 🚨 Vulnerability:Directly insertion of unescaped HTML
+                    html += `
+                        <div class="post">
+                            <h3>${post.title}</h3>
+                            <div class="post-meta">
+                                Posted by user ID: ${post.author_id} on 
+                                ${new Date(post.created_at).toLocaleDateString()}
+                            </div>
+                            <div class="post-content">
+                                ${post.content}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                resultsContainer.innerHTML = html;
+                
+            } catch (error) {
+                showResults(`Error: ${error.message}`);
+            }
+        }
+        
+        function showResults(message) {
+            const resultsContainer = document.getElementById('searchResults');
+            resultsContainer.innerHTML = `<div class="card"><p>${message}</p></div>`;
+        }
+        
+        document.getElementById('searchButton').addEventListener('click', searchPosts);
+        
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchPosts();
+            }
+        });
+        
+        // Initialization
+        async function init() {
+            await getUserInfo();
+        }
+        
+        init();
+    </script>
+</body>
+</html>

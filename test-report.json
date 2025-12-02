@@ -1,0 +1,23 @@
+{
+  "timestamp": "2025-12-02T15:40:34.446Z",
+  "summary": {
+    "total": 3,
+    "passed": 0,
+    "failed": 3,
+    "duration": 523
+  },
+  "results": [
+    {
+      "test": "API Security Tests",
+      "passed": false
+    },
+    {
+      "test": "UI/Functional Tests",
+      "passed": false
+    },
+    {
+      "test": "DAST Security Scan",
+      "passed": false
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "scripts": {
+    "test": "node test/test-runner.js",
+    "test:api": "node test/test-api.js",
+    "test:ui": "node test/test-selenium.js",
+    "test:zap": "node test/zap-test.js",
+    "test:security": "npm run test:api && npm run test:ui"
+  },
+  "devDependencies": {
+    "chrome": "^0.1.0",
+    "chromedriver": "^114.0.3",
+    "selenium-webdriver": "^4.38.0"
+  }
+}

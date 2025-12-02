@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOM-based XSS - Insecure Version</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚨 DOM-based XSS</h1>
+            <p>Insecure Version - DOM-based XSS Vulnerability</p>
+        </div>
+        
+        <div class="nav">
+            <a href="/">Home</a>
+            <a href="/login.html">Login</a>
+            <a href="/register.html">Register</a>
+            <a href="/posts.html">All Posts</a>
+            <a href="/create-post.html">Create Post</a>
+            <a href="/search.html">Search</a>
+            <a href="/users.html">Users</a>
+            <a href="/reflect-xss.html">Reflected XSS</a>
+            <a href="/dom-xss.html">DOM XSS</a>
+        </div>
+        
+        <div class="content">
+            <div id="userInfo" class="user-corner" style="display: none;">
+            </div>
+            
+            <div class="card">
+                <h3>DOM-based XSS Examples</h3>
+                
+                <div class="security-demo">
+                    <h3>💡 Example 1: URL Hash Injection</h3>
+                    <p>Try this URL:</p>
+                    <code>http://localhost:3001/dom-xss.html#&lt;script&gt;alert('DOM XSS from Hash')&lt;/script&gt;</code>
+                    
+                    <h3>💡 Example 2: URL Parameter Injection</h3>
+                    <p>Try this URL:</p>
+                    <code>http://localhost:3001/dom-xss.html?message=&lt;img src=x onerror=alert('DOM XSS from Param')&gt;</code>
+
+                    <h3>💡 Example 3: Eval Injection</h3>
+                    <p>Enter JavaScript code in the form below</p>
+                </div>
+            </div>
+            
+            <!-- 🚨 vulnerability:DOM-based XSS Example 1 - Injection from hash -->
+            <div class="card">
+                <h4>Example 1: Hash-based DOM XSS</h4>
+                <div id="hashOutput"></div>
+            </div>
+            
+            <!-- 🚨 Vulnerability: DOM-based XSS Example 2 - Injection from URL parameter -->
+            <div class="card">
+                <h4>Example 2: Parameter-based DOM XSS</h4>
+                <div id="paramOutput"></div>
+            </div>
+            
+            <!-- 🚨 Vulnerability: DOM-based XSS Example 3 - eval Injection -->
+            <div class="card">
+                <h4>Example 3: Eval-based DOM XSS</h4>
+                <div class="form-group">
+                    <label for="evalInput">Enter JavaScript code:</label>
+                    <input type="text" id="evalInput" placeholder="alert('Eval XSS')">
+                    <button id="evalButton" class="btn">Execute</button>
+                </div>
+                <div id="evalOutput"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let sessionId = localStorage.getItem('sessionId');
+        
+        async function getUserInfo() {
+            if (!sessionId) return;
+            
+            try {
+                const response = await fetch('/api/user', {
+                    headers: {
+                        'Authorization': sessionId
+                    }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    currentUser = data.user;
+                    displayUserInfo();
+                }
+            } catch (error) {
+                localStorage.removeItem('sessionId');
+                sessionId = null;
+            }
+        }
+        
+        function displayUserInfo() {
+            if (currentUser) {
+                const userInfoDiv = document.getElementById('userInfo');
+                userInfoDiv.style.display = 'block';
+                userInfoDiv.innerHTML = `
+                    <div class="user-info">
+                        <strong>Welcome, ${currentUser.username}</strong>
+                        <span class="security-badge">${currentUser.role}</span>
+                        <button id="logoutButton" class="btn btn-danger">Logout</button>
+                    </div>
+                `;
+                
+                document.getElementById('logoutButton').addEventListener('click', logout);
+            }
+        }
+        
+        async function logout() {
+            try {
+                const response = await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': sessionId
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    localStorage.removeItem('sessionId');
+                    sessionId = null;
+                    currentUser = null;
+                    window.location.href = '/';
+                } else {
+                    alert('Logout failed');
+                }
+            } catch (error) {
+                alert('Logout failed');
+            }
+        }
+        
+        // 🚨 Vulnerability 1:Direct insertion of HTML from URL hash
+        const hashContent = window.location.hash.substring(1);
+        if (hashContent) {
+            document.getElementById('hashOutput').innerHTML = 
+                "Content from URL hash: " + hashContent;
+        }
+        
+        // 🚨 Vulnerability 2:Direct insertion of HTML from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const message = urlParams.get('message');
+        if (message) {
+            document.getElementById('paramOutput').innerHTML = 
+                "Message from URL: " + message;
+        }
+        
+        // 🚨 Vulnerability 3:Using eval to execute user input
+        function executeEval() {
+            const userCode = document.getElementById('evalInput').value;
+            if (userCode) {
+                try {
+                    // 🚨 Danger:Direct execution of user input code
+                    eval(userCode);
+                    document.getElementById('evalOutput').innerHTML = 
+                        "Executed: " + userCode;
+                } catch (error) {
+                    document.getElementById('evalOutput').innerHTML = 
+                        "Error: " + error.message;
+                }
+            }
+        }
+
+        // Repair:Add execution button click event
+        document.getElementById('evalButton').addEventListener('click', executeEval);
+        
+        document.getElementById('evalInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                executeEval();
+            }
+        });
+        
+        // Auto-demo on page load
+        window.addEventListener('load', function() {
+            if (hashContent || message) {
+                setTimeout(() => {
+                    alert('DOM-based XSS page loaded with vulnerable code!');
+                }, 500);
+            }
+        });
+        
+        // Initialization
+        async function init() {
+            await getUserInfo();
+        }
+        
+        init();
+    </script>
+</body>
+</html>

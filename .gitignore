@@ -1,0 +1,30 @@
+# Node.js
+node_modules/
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+security.log
+
+# Database
+*.sql
+!database/init-insecure.sql
+!database/init-secure.sql
+!database/sample-data.sql
+
+# Temporary
+tmp/
+*.tmp

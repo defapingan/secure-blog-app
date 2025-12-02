@@ -1,0 +1,29 @@
+{
+  "timestamp": "2025-12-02T17:59:19.873Z",
+  "summary": {
+    "total": 3,
+    "passed": 3,
+    "failed": 0,
+    "duration": 51250
+  },
+  "results": [
+    {
+      "test": "API Security Tests",
+      "file": "test-api.js",
+      "passed": true,
+      "timestamp": "2025-12-02T17:59:19.875Z"
+    },
+    {
+      "test": "UI/Functional Tests",
+      "file": "test-selenium.js",
+      "passed": true,
+      "timestamp": "2025-12-02T17:59:19.875Z"
+    },
+    {
+      "test": "DAST Security Scan",
+      "file": "zap-test.js",
+      "passed": true,
+      "timestamp": "2025-12-02T17:59:19.875Z"
+    }
+  ]
+}

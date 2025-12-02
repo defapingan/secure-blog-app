@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOM-based XSS - Secure Version</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛡️ DOM-based XSS</h1>
+            <p>Secure Version - DOM XSS Protection Enabled</p>
+        </div>
+        
+        <div class="nav">
+            <a href="/">Home</a>
+            <a href="/login.html">Login</a>
+            <a href="/register.html">Register</a>
+            <a href="/posts.html">All Posts</a>
+            <a href="/create-post.html">Create Post</a>
+            <a href="/search.html">Search</a>
+            <a href="/reflect-xss.html">Reflected XSS</a>
+            <a href="/dom-xss.html">DOM XSS</a>
+        </div>
+        
+        <div class="content">
+            <div id="userInfo" class="user-corner" style="display: none;">
+            </div>
+            
+            <div class="security-indicator">
+                ✅ SECURE: DOM-based XSS protections implemented
+            </div>
+            
+            <div class="card">
+                <h3>DOM-based XSS Security Examples</h3>
+                
+                <div class="security-features">
+                    <h3>🛡️ Security Features Implemented:</h3>
+                    <p><strong>Safe DOM Manipulation:</strong> Using textContent instead of innerHTML</p>
+                    <p><strong>Input Validation:</strong> Validating all external inputs</p>
+                    <p><strong>No eval():</strong> Avoiding dangerous JavaScript functions</p>
+                    <p><strong>Content Security Policy:</strong> Blocking unsafe inline scripts</p>
+                </div>
+            </div>
+            
+            <!-- 🛡️ secure:DOM-based XSS Example 1 - Handling hash security -->
+            <div class="card">
+                <h4>Example 1: Safe Hash Handling</h4>
+                <div id="hashOutput"></div>
+                <p><em>URL hash content is safely displayed as text</em></p>
+            </div>
+            
+            <!-- 🛡️ secure:DOM-based XSS Example 2 - Handling URL Parameters Safely -->
+            <div class="card">
+                <h4>Example 2: Safe Parameter Handling</h4>
+                <div id="paramOutput"></div>
+                <p><em>URL parameters are safely displayed as text</em></p>
+            </div>
+            
+            <!-- 🛡️ secure:DOM-based XSS Example 3 - Handling User Input Safely -->
+            <div class="card">
+                <h4>Example 3: Safe User Input Handling</h4>
+                <div class="form-group">
+                    <label for="userInput">Enter text (safe display):</label>
+                    <input type="text" id="userInput" placeholder="Enter any text safely">
+                    <button id="displayButton" class="btn">Display Safely</button>
+                </div>
+                <div id="safeOutput"></div>
+                <p><em>User input is safely displayed using textContent</em></p>
+            </div>
+
+            <div class="security-info">
+                <h3>🔒 Security Demonstrations:</h3>
+                <p>Try these URLs to see how they're safely handled:</p>
+                <code>http://localhost:3002/dom-xss.html#&lt;script&gt;alert('XSS')&lt;/script&gt;</code><br>
+                <code>http://localhost:3002/dom-xss.html?message=&lt;img src=x onerror=alert('XSS')&gt;</code>
+                <p><em>Note: No scripts will work, content is safely displayed as text</em></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let csrfToken = '';
+
+        async function getUserInfo() {
+            try {
+                const response = await fetch('/api/user');
+                if (response.ok) {
+                    const data = await response.json();
+                    currentUser = data.user;
+                    displayUserInfo();
+                }
+            } catch (error) {
+            }
+        }
+
+        // 🛡️ secure:get CSRF token
+        async function getCsrfToken() {
+            try {
+                const response = await fetch('/api/csrf-token');
+                const data = await response.json();
+                csrfToken = data.csrfToken;
+            } catch (error) {
+                console.error('Failed to get CSRF token:', error);
+            }
+        }
+
+        // 🛡️ secure:HTML escape function
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function displayUserInfo() {
+            if (currentUser) {
+                const userInfoDiv = document.getElementById('userInfo');
+                userInfoDiv.style.display = 'block';
+                userInfoDiv.innerHTML = `
+                    <div class="user-info">
+                        <strong>Welcome, ${escapeHtml(currentUser.username)}</strong>
+                        <span class="security-badge">${escapeHtml(currentUser.role)}</span>
+                        <button id="logoutButton" class="btn btn-danger">Logout</button>
+                    </div>
+                `;
+                
+                document.getElementById('logoutButton').addEventListener('click', logout);
+            }
+        }
+
+        async function logout() {
+            try {
+                const response = await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        _csrf: csrfToken
+                    })
+                });
+                
+                if (response.ok) {
+                    window.location.href = '/';
+                } else {
+                    alert('Logout failed');
+                }
+            } catch (error) {
+                alert('Logout failed');
+            }
+        }
+        
+        // 🛡️ secure:Display URL hash securely as text
+        const hashContent = window.location.hash.substring(1);
+        if (hashContent) {
+            document.getElementById('hashOutput').textContent = 
+                "Content from URL hash: " + hashContent;
+        }
+        
+        // 🛡️ secure:Display URL parameters safely as text
+        const urlParams = new URLSearchParams(window.location.search);
+        const message = urlParams.get('message');
+        if (message) {
+            document.getElementById('paramOutput').textContent = 
+                "Message from URL: " + message;
+        }
+        
+        // 🛡️ secure:Handle user input safely
+        function safeDisplay() {
+            const userInput = document.getElementById('userInput').value;
+            if (userInput) {
+                document.getElementById('safeOutput').textContent = 
+                    "You entered: " + userInput;
+            }
+        }
+
+        document.getElementById('displayButton').addEventListener('click', safeDisplay);
+        
+        document.getElementById('userInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                safeDisplay();
+            }
+        });
+
+        // Initialization
+        async function initUser() {
+            await getCsrfToken();
+            await getUserInfo();
+        }
+
+        initUser();
+    </script>
+</body>
+</html>
