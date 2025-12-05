@@ -1,3 +1,5 @@
+do the "npm install" in "secure-blog-app/", "secure-blog-app/insecure-version" and "secure-blog-app/secure-version" first!
+
 # Secure Blog Application
 
 ## Project Overview
